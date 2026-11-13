@@ -1,0 +1,13 @@
+{
+  "name": "skypip",
+  "version": "1.1.0",
+  "description": "Skypip — a one-touch arcade flyer with a world leaderboard.",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
