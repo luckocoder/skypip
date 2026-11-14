@@ -35,6 +35,17 @@ Then open:
 http://localhost:3000
 ```
 
+## Deploy to Render
+
+The repository includes a Render Blueprint in `render.yaml`. To deploy:
+
+1. Push the project to GitHub.
+2. In Render, create a new **Blueprint** and select this GitHub repository.
+3. Review the `skypip` web service and confirm its creation.
+4. Open the URL Render provides after the first deploy.
+
+The service uses a persistent disk mounted at `/var/data`, so leaderboard data and the generated token-signing secret survive deploys and restarts. Render persistent disks require a paid service plan; check Render's current pricing before confirming. Do not remove the disk or change `DATA_DIR` unless you have migrated the stored data.
+
 ## Environment variables
 
 You can customize the app with the following variables:
