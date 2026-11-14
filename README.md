@@ -16,6 +16,8 @@ Skypip is a lightweight arcade browser game inspired by Flappy Bird, with a smal
 - `css/` — styles
 - `js/` — game logic, input, audio, UI, world rendering
 - `server.js` — HTTP server and leaderboard API
+- `functions/` — Cloudflare Pages API handlers
+- `migrations/` — Cloudflare D1 database schema
 - `data/` — persistent leaderboard storage
 
 ## Prerequisites
@@ -35,16 +37,25 @@ Then open:
 http://localhost:3000
 ```
 
-## Deploy to Render
+## Deploy for free with Cloudflare Pages
 
-The repository includes a Render Blueprint in `render.yaml`. To deploy:
+The Cloudflare Pages version serves the game as static files and runs the leaderboard API as Pages Functions, with player data in D1.
 
-1. Push the project to GitHub.
-2. In Render, create a new **Blueprint** and select this GitHub repository.
-3. Review the `skypip` web service and confirm its creation.
-4. Open the URL Render provides after the first deploy.
+1. Create a D1 database named `skypip` in the Cloudflare dashboard.
+2. Open that database's SQL console and run the contents of `migrations/0001_init.sql`.
+3. Create a Pages project from this GitHub repository. Set the build command to `npm run build` and the output directory to `dist`.
+4. In the Pages project's **Settings → Functions → D1 database bindings**, add a binding named `DB` and select the `skypip` database.
+5. Add a secret environment variable named `LEADERBOARD_SECRET` for the production environment. Generate a value locally with:
 
-The service uses a persistent disk mounted at `/var/data`, so leaderboard data and the generated token-signing secret survive deploys and restarts. Render persistent disks require a paid service plan; check Render's current pricing before confirming. Do not remove the disk or change `DATA_DIR` unless you have migrated the stored data.
+   ```bash
+   node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+   ```
+
+6. Deploy the project and open the URL Cloudflare provides.
+
+Cloudflare's Workers Free plan has daily request and database quotas. Check the current [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) and [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/) before launch. The Pages Functions API requires the `DB` binding and `LEADERBOARD_SECRET`; without them, leaderboard requests will return an error.
+
+The D1 database starts empty; local scores in `data/scores.json` are not imported automatically. The `LEADERBOARD_SECRET` in Cloudflare is separate from the key used by the local Node server.
 
 ## Environment variables
 
@@ -117,6 +128,7 @@ Updates a player name.
 ## Notes
 
 - The leaderboard data file is stored in JSON format under `data/scores.json`.
+- The Cloudflare deployment stores leaderboard data in D1 instead.
 - The server validates the score against a minimum run time to reduce fake submissions.
 - This project is intentionally lightweight and has no external dependencies.
 
