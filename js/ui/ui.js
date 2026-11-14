@@ -70,6 +70,9 @@
     this.hud = $('hud');
     this.scoreEl = $('score');
     this.toastEl = $('toast');
+    this.usernameEl = $('screen-username');
+    this.usernameOpen = false;
+    this._usernameSaving = false;
     this.screens = {
       menu: $('screen-menu'),
       ready: $('screen-ready'),
@@ -98,6 +101,7 @@
 
     this._layout({ scale: game.scale, W: game.W, H: game.H, groundY: game.groundY, cssW: game.canvas.clientWidth, cssH: game.canvas.clientHeight, dpr: game.dpr });
     this._show('menu');
+    if (!this.lb.isRegistered()) this.openUsername();
   }
 
   // ---------------------------------------------------------------- layout
@@ -173,12 +177,18 @@
       self.audio.play('click');
       self._saveName();
     });
+    $('username-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      self.audio.play('click');
+      self._submitUsername();
+    });
   };
 
   // ---------------------------------------------------------------- actions
 
   UI.prototype.play = function () {
     if (this.game.state !== 'menu') return;
+    if (!this.lb.isRegistered()) { this.openUsername(); return; }
     this.closeSettings();
     this.closeBoard();
     this.audio.play('swoosh');
@@ -202,7 +212,10 @@
 
   UI.prototype.confirm = function () {
     var s = this.game.state;
-    if (this.settingsOpen) this.closeSettings();
+    if (this.usernameOpen) {
+      var form = this.$('username-form');
+      if (form.requestSubmit) form.requestSubmit();
+    } else if (this.settingsOpen) this.closeSettings();
     else if (this.boardOpen) this.closeBoard();
     else if (s === 'menu') this.play();
     else if (s === 'over') this.tryRestart();
@@ -212,6 +225,7 @@
 
   UI.prototype.togglePause = function () {
     var g = this.game;
+    if (this.usernameOpen) return;
     if (this.settingsOpen) { this.closeSettings(); return; }
     if (this.boardOpen) { this.closeBoard(); return; }
     if (g.state === 'playing') g.pause();
@@ -395,6 +409,7 @@
   };
 
   UI.prototype.openSettings = function () {
+    if (this.usernameOpen) return;
     this.settingsOpen = true;
     this.settingsEl.classList.add('active');
     this.settingsEl.setAttribute('aria-hidden', 'false');
@@ -410,11 +425,72 @@
   // ---------------------------------------------------------------- world ranking
 
   UI.prototype.anyModal = function () {
-    return this.settingsOpen || this.boardOpen;
+    return this.usernameOpen || this.settingsOpen || this.boardOpen;
+  };
+
+  UI.prototype.openUsername = function () {
+    if (this.usernameOpen) return;
+    this.closeSettings();
+    this.closeBoard();
+    this.usernameOpen = true;
+    this.$('username-input').value = this.lb.name();
+    this._usernameStatus('', '');
+    this.usernameEl.classList.add('active');
+    this.usernameEl.setAttribute('aria-hidden', 'false');
+  };
+
+  UI.prototype.closeUsername = function () {
+    if (!this.usernameOpen) return;
+    this.usernameOpen = false;
+    this.$('username-input').blur();
+    this.usernameEl.classList.remove('active');
+    this.usernameEl.setAttribute('aria-hidden', 'true');
+  };
+
+  UI.prototype._usernameStatus = function (text, kind) {
+    var status = this.$('username-status');
+    status.textContent = text;
+    status.className = 'name-status' + (kind ? ' ' + kind : '');
+  };
+
+  UI.prototype._nameError = function (reason) {
+    if (reason === 'taken') return 'That username is already taken. Choose another.';
+    if (reason === 'invalid') return 'Use 2-14 letters, numbers, spaces, or _ . -';
+    return 'Could not verify the username. Check your connection and try again.';
+  };
+
+  UI.prototype._submitUsername = function () {
+    var self = this, input = this.$('username-input');
+    if (this._usernameSaving) return;
+    var name = S.Leaderboard.cleanName(input.value);
+    if (!name) {
+      this._usernameStatus(this._nameError('invalid'), 'err');
+      input.focus();
+      return;
+    }
+
+    this._usernameSaving = true;
+    input.disabled = true;
+    this.$('btn-username-save').disabled = true;
+    this._usernameStatus('Checking username…', '');
+    this.lb.rename(name).then(function (result) {
+      if (result.ok) {
+        input.value = result.name;
+        self.closeUsername();
+      } else {
+        self._usernameStatus(self._nameError(result.reason), 'err');
+        if (result.reason === 'taken') input.value = '';
+      }
+    }).finally(function () {
+      self._usernameSaving = false;
+      input.disabled = false;
+      self.$('btn-username-save').disabled = false;
+      if (self.usernameOpen) input.focus();
+    });
   };
 
   UI.prototype.openBoard = function () {
-    if (this.boardOpen) return;
+    if (this.usernameOpen || this.boardOpen) return;
     this.closeSettings();
     this.boardOpen = true;
     this.boardEl.classList.add('active');
@@ -524,13 +600,13 @@
     this._nameStatus('Saving…', '');
     this.lb.rename(input.value).then(function (r) {
       if (!r.ok) {
-        self._nameStatus('Use 2–14 letters, numbers, spaces, or _ . -', 'err');
+        self._nameStatus(self._nameError(r.reason), 'err');
         return;
       }
       input.value = r.name;
       input.blur();
-      self._nameStatus(r.synced ? 'Name saved' : 'Saved here; it will update with your next score', 'ok');
-      if (self.boardOpen && r.synced) self._loadBoard();
+      self._nameStatus('Name saved', 'ok');
+      if (self.boardOpen) self._loadBoard();
     });
   };
 

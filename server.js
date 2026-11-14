@@ -63,6 +63,15 @@ try {
   }
 }
 
+const nameOwners = new Map();
+for (const id of Object.keys(db.players)) {
+  const p = db.players[id];
+  if (p && typeof p.name === 'string') {
+    const key = nameKey(cleanName(p.name) || p.name);
+    if (!nameOwners.has(key)) nameOwners.set(key, id);
+  }
+}
+
 let saveTimer = null;
 function saveNow() {
   saveTimer = null;
@@ -106,7 +115,7 @@ function board(kind) {
   const list = [];
   for (const id in db.players) {
     const p = db.players[id];
-    list.push({ id, name: p.name, score: p.best, at: p.bestAt });
+    if (p.best > 0) list.push({ id, name: p.name, score: p.best, at: p.bestAt });
   }
   cache.all = list.sort(byScore);
   return cache.all;
@@ -171,6 +180,28 @@ function cleanName(v) {
   if (typeof v !== 'string') return null;
   const n = v.normalize('NFKC').replace(/\s+/g, ' ').trim();
   return NAME_RE.test(n) ? n : null;
+}
+
+function nameKey(name) {
+  return name.normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function nameTaken(name, id) {
+  const owner = nameOwners.get(nameKey(name));
+  return !!owner && owner !== id;
+}
+
+function claimName(id, name) {
+  const key = nameKey(name);
+  const owner = nameOwners.get(key);
+  if (owner && owner !== id) return false;
+  const p = db.players[id];
+  if (p && typeof p.name === 'string') {
+    const previousKey = nameKey(cleanName(p.name) || p.name);
+    if (nameOwners.get(previousKey) === id) nameOwners.delete(previousKey);
+  }
+  nameOwners.set(key, id);
+  return true;
 }
 
 function clientIp(req) {
@@ -245,11 +276,13 @@ async function api(req, res, url) {
   if (route === 'POST /api/scores') {
     let body;
     try { body = await readJson(req); } catch (e) { return send(res, 400, { error: 'Bad request' }); }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return send(res, 400, { error: 'Bad request' });
     const id = body.playerId, score = body.score;
     const name = cleanName(body.name);
     if (typeof id !== 'string' || !ID_RE.test(id)) return send(res, 400, { error: 'Invalid player' });
     if (!name) return send(res, 400, { error: 'Invalid name' });
     if (!Number.isInteger(score) || score < 1 || score > MAX_SCORE) return send(res, 400, { error: 'Invalid score' });
+    if (nameTaken(name, id)) return send(res, 409, { error: 'Username already taken' });
 
     const started = consumeToken(body.token);
     if (started === null) return send(res, 403, { error: 'Invalid run token' });
@@ -258,6 +291,9 @@ async function api(req, res, url) {
     let p = db.players[id];
     if (!p) {
       if (Object.keys(db.players).length >= MAX_PLAYERS) return send(res, 503, { error: 'Leaderboard full' });
+    }
+    if (!claimName(id, name)) return send(res, 409, { error: 'Username already taken' });
+    if (!p) {
       p = db.players[id] = { name, best: 0, bestAt: 0, week: null, games: 0 };
     }
     const now = Date.now(), wk = weekKey(new Date());
@@ -278,11 +314,22 @@ async function api(req, res, url) {
   if (route === 'POST /api/name') {
     let body;
     try { body = await readJson(req); } catch (e) { return send(res, 400, { error: 'Bad request' }); }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return send(res, 400, { error: 'Bad request' });
     const name = cleanName(body.name);
     if (typeof body.playerId !== 'string' || !ID_RE.test(body.playerId)) return send(res, 400, { error: 'Invalid player' });
     if (!name) return send(res, 400, { error: 'Invalid name' });
-    const p = db.players[body.playerId];
-    if (p && p.name !== name) { p.name = name; invalidate(); scheduleSave(); }
+    if (nameTaken(name, body.playerId)) return send(res, 409, { error: 'Username already taken' });
+    let p = db.players[body.playerId];
+    if (!p && Object.keys(db.players).length >= MAX_PLAYERS) return send(res, 503, { error: 'Leaderboard full' });
+    if (!claimName(body.playerId, name)) return send(res, 409, { error: 'Username already taken' });
+    if (!p) {
+      p = db.players[body.playerId] = { name, best: 0, bestAt: 0, week: null, games: 0 };
+      scheduleSave();
+    } else if (p.name !== name) {
+      p.name = name;
+      invalidate();
+      scheduleSave();
+    }
     return send(res, 200, { ok: true, name });
   }
 

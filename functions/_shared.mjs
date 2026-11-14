@@ -37,6 +37,10 @@ function cleanName(value) {
   return NAME_RE.test(name) ? name : null;
 }
 
+function nameKey(name) {
+  return name.normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
 function limited(request, cost) {
   const now = Date.now();
   if (now - lastHitCleanup > 60000) {
@@ -141,14 +145,14 @@ async function readJson(request) {
 
 async function getPlayer(db, id) {
   return db.prepare(
-    'SELECT id, name, best, best_at, week_key, week_score, week_at, games FROM players WHERE id = ?'
+    'SELECT id, name, name_key, best, best_at, week_key, week_score, week_at, games FROM players WHERE id = ?'
   ).bind(id).first();
 }
 
 async function rankOf(db, kind, id, currentWeek) {
   const fields = kind === 'week'
     ? 'id, name, week_score AS score, ROW_NUMBER() OVER (ORDER BY week_score DESC, week_at ASC) AS position FROM players WHERE week_key = ?'
-    : 'id, name, best AS score, ROW_NUMBER() OVER (ORDER BY best DESC, best_at ASC) AS position FROM players';
+    : 'id, name, best AS score, ROW_NUMBER() OVER (ORDER BY best DESC, best_at ASC) AS position FROM players WHERE best > 0';
   const query = `SELECT position, name, score FROM (SELECT ${fields}) WHERE id = ?`;
   const result = kind === 'week'
     ? await db.prepare(query).bind(currentWeek, id).first()
@@ -158,13 +162,13 @@ async function rankOf(db, kind, id, currentWeek) {
 
 async function getBoard(db, kind, currentWeek, playerId, limit) {
   const isWeek = kind === 'week';
-  const where = isWeek ? ' WHERE week_key = ?' : '';
+  const where = isWeek ? ' WHERE week_key = ?' : ' WHERE best > 0';
   const scoreField = isWeek ? 'week_score' : 'best';
   const atField = isWeek ? 'week_at' : 'best_at';
   const rankSql = `SELECT id, name, ${scoreField} AS score, ${atField} AS at, ROW_NUMBER() OVER (ORDER BY ${scoreField} DESC, ${atField} ASC) AS position FROM players${where}`;
   const countQuery = isWeek
     ? await db.prepare('SELECT COUNT(*) AS total FROM players WHERE week_key = ?').bind(currentWeek).first()
-    : await db.prepare('SELECT COUNT(*) AS total FROM players').first();
+    : await db.prepare('SELECT COUNT(*) AS total FROM players WHERE best > 0').first();
   const rows = isWeek
     ? await db.prepare(`SELECT * FROM (${rankSql}) ORDER BY score DESC, at ASC LIMIT ?`).bind(currentWeek, limit).all()
     : await db.prepare(`SELECT * FROM (${rankSql}) ORDER BY score DESC, at ASC LIMIT ?`).bind(limit).all();
@@ -233,6 +237,10 @@ export async function api(request, env) {
       if (!name) return response(400, { error: 'Invalid name' });
       if (!Number.isInteger(score) || score < 1 || score > MAX_SCORE) return response(400, { error: 'Invalid score' });
       if (!env.LEADERBOARD_SECRET) return response(503, { error: 'LEADERBOARD_SECRET is not configured' });
+      const key = nameKey(name);
+      const owner = await env.DB.prepare('SELECT id FROM players WHERE name_key = ? AND id != ?')
+        .bind(key, playerId).first();
+      if (owner) return response(409, { error: 'Username already taken' });
 
       const started = await consumeToken(body.token, env.LEADERBOARD_SECRET, env.DB);
       if (started === null) return response(403, { error: 'Invalid run token' });
@@ -247,10 +255,11 @@ export async function api(request, env) {
       const currentWeek = weekKey(new Date(now));
       const improved = !previous || score > previous.best;
       await env.DB.prepare(
-        `INSERT INTO players (id, name, best, best_at, week_key, week_score, week_at, games)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        `INSERT INTO players (id, name, name_key, best, best_at, week_key, week_score, week_at, games)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
          ON CONFLICT(id) DO UPDATE SET
            name = excluded.name,
+           name_key = excluded.name_key,
            best = MAX(players.best, excluded.best),
            best_at = CASE WHEN excluded.best > players.best THEN excluded.best_at ELSE players.best_at END,
            week_score = CASE
@@ -265,7 +274,7 @@ export async function api(request, env) {
            END,
            week_key = excluded.week_key,
            games = players.games + 1`
-      ).bind(playerId, name, score, now, currentWeek, score, now).run();
+      ).bind(playerId, name, key, score, now, currentWeek, score, now).run();
 
       const player = await getPlayer(env.DB, playerId);
       const allRank = await rankOf(env.DB, 'all', playerId, currentWeek);
@@ -295,14 +304,32 @@ export async function api(request, env) {
       const name = cleanName(body.name);
       if (typeof body.playerId !== 'string' || !ID_RE.test(body.playerId)) return response(400, { error: 'Invalid player' });
       if (!name) return response(400, { error: 'Invalid name' });
-      await env.DB.prepare('UPDATE players SET name = ? WHERE id = ? AND name != ?')
-        .bind(name, body.playerId, name).run();
+      const key = nameKey(name);
+      const owner = await env.DB.prepare('SELECT id FROM players WHERE name_key = ? AND id != ?')
+        .bind(key, body.playerId).first();
+      if (owner) return response(409, { error: 'Username already taken' });
+      const player = await getPlayer(env.DB, body.playerId);
+      if (!player) {
+        const count = await env.DB.prepare('SELECT COUNT(*) AS total FROM players').first();
+        if (count.total >= MAX_PLAYERS) return response(503, { error: 'Leaderboard full' });
+        await env.DB.prepare(
+          `INSERT INTO players (id, name, name_key, best, best_at, week_key, week_score, week_at, games)
+           VALUES (?, ?, ?, 0, 0, NULL, NULL, NULL, 0)`
+        ).bind(body.playerId, name, key).run();
+      } else if (player.name !== name || player.name_key !== key) {
+        await env.DB.prepare('UPDATE players SET name = ?, name_key = ? WHERE id = ?')
+          .bind(name, key, body.playerId).run();
+      }
       return response(200, { ok: true, name });
     }
 
     return response(404, { error: 'Not found' });
   } catch (error) {
     console.error('api error', error);
+    if (error && typeof error.message === 'string' &&
+        error.message.includes('UNIQUE constraint failed: players.name_key')) {
+      return response(409, { error: 'Username already taken' });
+    }
     return response(500, { error: 'Server error' });
   }
 }

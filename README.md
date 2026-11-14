@@ -7,6 +7,7 @@ Skypip is a lightweight arcade browser game inspired by Flappy Bird, with a smal
 - One-touch arcade gameplay with keyboard and touch support
 - Pause, settings, sound controls, and replay flow
 - Persistent leaderboard with weekly and all-time rankings
+- First-visit username registration with case-insensitive uniqueness
 - Server-side score validation and anti-abuse token checks
 - Static frontend served from a small Node HTTP server
 
@@ -42,7 +43,7 @@ http://localhost:3000
 The Cloudflare Pages version serves the game as static files and runs the leaderboard API as Pages Functions, with player data in D1.
 
 1. Create a D1 database named `skypip` in the Cloudflare dashboard.
-2. Open that database's SQL console and run the contents of `migrations/0001_init.sql`.
+2. Before deploying this version, run the migrations in order from `migrations/`. If `0001_init.sql` was already applied for an existing deployment, run only `0002_unique_usernames.sql` once.
 3. Create a Pages project from this GitHub repository. Set the build command to `npm run build` and the output directory to `dist`.
 4. In the Pages project's **Settings → Functions → D1 database bindings**, add a binding named `DB` and select the `skypip` database.
 5. Add a secret environment variable named `LEADERBOARD_SECRET` for the production environment. Generate a value locally with:
@@ -56,6 +57,7 @@ The Cloudflare Pages version serves the game as static files and runs the leader
 Cloudflare's Workers Free plan has daily request and database quotas. Check the current [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) and [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/) before launch. The Pages Functions API requires the `DB` binding and `LEADERBOARD_SECRET`; without them, leaderboard requests will return an error.
 
 The D1 database starts empty; local scores in `data/scores.json` are not imported automatically. The `LEADERBOARD_SECRET` in Cloudflare is separate from the key used by the local Node server.
+The username migration reserves names without adding zero-score entries to the ranking. Existing duplicate names are changed to a unique `Pip` name based on the player's ID.
 
 ## Environment variables
 
@@ -123,7 +125,7 @@ Response example:
 Returns leaderboard data for the selected board.
 
 ### `POST /api/name`
-Updates a player name.
+Claims or updates a unique player name. Names are saved in the browser after the API confirms the claim.
 
 ## Notes
 

@@ -166,6 +166,19 @@
           <button type="button" class="btn btn-primary btn-block" id="btn-board-close"><span>DONE</span></button>
         </div>
       </section>
+
+      <!-- REQUIRED FIRST-VISIT USERNAME -->
+      <section class="screen screen-username modal" id="screen-username" aria-label="Choose a username" aria-hidden="true">
+        <div class="panel menu-panel username-panel">
+          <h2 class="ribbon">CHOOSE USERNAME</h2>
+          <p class="username-copy">Pick a unique name for the world ranking. Use 2-14 letters, numbers, spaces, or _ . -</p>
+          <form class="name-row" id="username-form" novalidate>
+            <input class="text-input" id="username-input" type="text" maxlength="14" autocomplete="username" autocapitalize="off" spellcheck="false" enterkeyhint="done" aria-label="Choose a username" placeholder="Your name" required>
+            <button type="submit" class="btn btn-secondary btn-small" id="btn-username-save"><span>CONTINUE</span></button>
+          </form>
+          <div class="name-status" id="username-status" role="status" aria-live="polite"></div>
+        </div>
+      </section>
     </div>
 
     <canvas id="fx" aria-hidden="true"></canvas>

@@ -32,7 +32,10 @@
     this.base = resolveBase();
     var d = store.data;
     if (!/^[A-Za-z0-9_-]{16,64}$/.test(d.playerId)) d.playerId = randomId();
-    if (!Leaderboard.cleanName(d.name)) d.name = 'Pip' + (1000 + Math.floor(Math.random() * 9000));
+    if (!d.nameConfirmed || !Leaderboard.cleanName(d.name)) {
+      d.name = '';
+      d.nameConfirmed = false;
+    }
     store.save();
     this._token = null;
     this._tokenReq = null;
@@ -48,6 +51,7 @@
   };
 
   Leaderboard.prototype.name = function () { return this.store.data.name; };
+  Leaderboard.prototype.isRegistered = function () { return this.store.data.nameConfirmed; };
 
   Leaderboard.prototype._request = function (method, path, body) {
     var ctrl = window.AbortController ? new AbortController() : null;
@@ -105,13 +109,18 @@
     var name = Leaderboard.cleanName(raw);
     if (!name) return Promise.resolve({ ok: false, reason: 'invalid' });
     var done = function (synced) {
-      self.store.set('name', name);
+      self.store.data.name = name;
+      self.store.data.nameConfirmed = true;
+      self.store.save();
       return { ok: true, name: name, synced: synced };
     };
-    // The name travels with every score, so saving locally is enough when offline.
     return this._request('POST', '/name', { playerId: this.store.data.playerId, name: name })
       .then(function () { return done(true); })
-      .catch(function (e) { return e.status === 400 ? { ok: false, reason: 'invalid' } : done(false); });
+      .catch(function (e) {
+        if (e.status === 400) return { ok: false, reason: 'invalid' };
+        if (e.status === 409) return { ok: false, reason: 'taken' };
+        return { ok: false, reason: e.status ? 'unavailable' : 'offline' };
+      });
   };
 
   S.Leaderboard = Leaderboard;

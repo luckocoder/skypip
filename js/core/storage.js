@@ -11,7 +11,8 @@
     volume: 0.8,
     shake: true,
     playerId: '', // anonymous random id for the world leaderboard
-    name: ''
+    name: '',
+    nameConfirmed: false
   };
 
   function Store() {
