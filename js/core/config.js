@@ -48,13 +48,13 @@
 
     // Score thresholds where the sky changes (day -> sunset -> night -> dawn ...)
     PHASE_EVERY: 15,
-    PHASE_NAMES: ['Day', 'Sunset', 'Night', 'Dawn'],
+    PHASE_NAMES: ['Jounen', 'Solèy kouche', 'Lannuit', 'Solèy leve'],
 
     MEDALS: [
-      { id: 'platinum', name: 'Platinum', min: 50 },
-      { id: 'gold', name: 'Gold', min: 30 },
-      { id: 'silver', name: 'Silver', min: 20 },
-      { id: 'bronze', name: 'Bronze', min: 10 }
+      { id: 'platinum', name: 'Platinòm', min: 50 },
+      { id: 'gold', name: 'Lò', min: 30 },
+      { id: 'silver', name: 'Ajan', min: 20 },
+      { id: 'bronze', name: 'Bwonz', min: 10 }
     ],
 
     medalFor: function (score) {

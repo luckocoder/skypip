@@ -22,6 +22,19 @@
     platinum: { hi: '#ffffff', mid: '#a9f0ff', lo: '#4a9fc4', rib1: '#9b7bff', rib2: '#6a4fd6' }
   };
 
+  var COUNTRY_NAMES_HT = {
+    AR: 'Ajantin', AU: 'Ostrali', BD: 'Bangladèch', BE: 'Bèljik', BR: 'Brezil',
+    CA: 'Kanada', CH: 'Swis', CL: 'Chili', CN: 'Lachin', CO: 'Kolonbi',
+    CR: 'Kosta Rika', CU: 'Kiba', DE: 'Almay', DK: 'Dànmak', DO: 'Repiblik Dominikèn',
+    EG: 'Ejip', ES: 'Espay', ET: 'Etyopi', FI: 'Fenlann', FR: 'Frans',
+    GB: 'Wayòm Ini', GH: 'Gana', GR: 'Grès', HT: 'Ayiti', IN: 'Lend',
+    IT: 'Itali', JM: 'Jamayik', JP: 'Japon', KE: 'Kenya', KR: 'Kore di Sid',
+    MA: 'Mawòk', MX: 'Meksik', NG: 'Nijerya', NL: 'Peyi Ba', NO: 'Nòvèj',
+    NZ: 'Nouvèl Zelann', PA: 'Panama', PK: 'Pakistan', PL: 'Polòy', PR: 'Pòtoriko',
+    PT: 'Pòtigal', RU: 'Larisi', SE: 'Syèd', SN: 'Senegal', UA: 'Ikrèn',
+    US: 'Etazini', VE: 'Venezyela', ZA: 'Afrik di Sid'
+  };
+
   function starPath(cx, cy, ro, ri) {
     var d = '';
     for (var i = 0; i < 10; i++) {
@@ -48,15 +61,19 @@
       '</svg>';
   }
 
-  function UI(game, audio, store, confetti, lb) {
+  function UI(game, audio, store, confetti, lb, presence) {
     this.game = game;
     this.audio = audio;
     this.store = store;
     this.confetti = confetti;
     this.lb = lb;
+    this.presence = presence;
+    this.globe = new S.Globe(document.getElementById('live-globe'));
     this.boardOpen = false;
     this.boardKind = 'week';
     this._boardReq = 0;
+    this._presenceReq = 0;
+    this._presenceTimer = 0;
     this._runId = 0;
     this.timers = [];
     this.overReady = false;
@@ -88,14 +105,20 @@
     this._bind();
     this._syncSettings();
     this._refreshBest();
+    this.$('presence-share').checked = this.presence.enabled;
 
     var self = this;
     game.on('state', function (s, prev) { self._onState(s, prev); });
     game.on('score', function (n, pop) { self._setScore(n, pop); });
     game.on('gameover', function (r) { self._showGameOver(r); });
     game.on('countdown', function (n) { self._countdown(n); });
-    game.on('milestone', function (m) { self._toast(m.name + ' medal!', m.id); });
-    var PHASE_TEXT = { Day: 'A brand new day', Sunset: 'Golden hour', Night: 'Night flight', Dawn: 'Dawn breaks' };
+    game.on('milestone', function (m) { self._toast('Ou genyen meday ' + m.name + '!', m.id); });
+    var PHASE_TEXT = {
+      Jounen: 'Yon nouvo jounen',
+      'Solèy kouche': 'Lè solèy kouche',
+      Lannuit: 'Vòl lannuit',
+      'Solèy leve': 'Solèy leve'
+    };
     game.on('phase', function (name) { self._toast(PHASE_TEXT[name] || name, 'phase'); });
     game.on('resize', function (info) { self._layout(info); });
 
@@ -171,6 +194,7 @@
         return;
       }
       if (e.target.closest('[data-retry]')) { self.audio.play('click'); self._loadBoard(); }
+      if (e.target.closest('[data-presence-retry]')) { self.audio.play('click'); self._loadPresence(); }
     });
     $('name-form').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -181,6 +205,9 @@
       e.preventDefault();
       self.audio.play('click');
       self._submitUsername();
+    });
+    $('presence-share').addEventListener('change', function () {
+      self.presence.setEnabled(this.checked);
     });
   };
 
@@ -347,20 +374,20 @@
 
   UI.prototype._buildSoundControls = function () {
     var html =
-      '<div class="setting-row"><span class="setting-label">' + ICON.sfx + 'Sound FX</span>' +
-      '<button type="button" class="switch" role="switch" data-key="sfx" aria-label="Sound effects"><span class="knob"></span></button></div>' +
-      '<div class="setting-row"><span class="setting-label">' + ICON.music + 'Music</span>' +
-      '<button type="button" class="switch" role="switch" data-key="music" aria-label="Music"><span class="knob"></span></button></div>' +
-      '<div class="setting-row setting-volume"><span class="setting-label">' + ICON.volume + 'Volume</span>' +
-      '<input class="slider" type="range" min="0" max="100" step="1" data-key="volume" aria-label="Volume"></div>';
+      '<div class="setting-row"><span class="setting-label">' + ICON.sfx + 'Efè son</span>' +
+      '<button type="button" class="switch" role="switch" data-key="sfx" aria-label="Efè son"><span class="knob"></span></button></div>' +
+      '<div class="setting-row"><span class="setting-label">' + ICON.music + 'Mizik</span>' +
+      '<button type="button" class="switch" role="switch" data-key="music" aria-label="Mizik"><span class="knob"></span></button></div>' +
+      '<div class="setting-row setting-volume"><span class="setting-label">' + ICON.volume + 'Volim</span>' +
+      '<input class="slider" type="range" min="0" max="100" step="1" data-key="volume" aria-label="Volim"></div>';
     var nodes = document.querySelectorAll('[data-sound-controls]');
     var self = this;
     for (var i = 0; i < nodes.length; i++) nodes[i].innerHTML = html;
 
     var sh = this.$('shake-row');
     if (sh) {
-      sh.innerHTML = '<span class="setting-label">' + ICON.shake + 'Screen shake</span>' +
-        '<button type="button" class="switch" role="switch" data-key="shake" aria-label="Screen shake"><span class="knob"></span></button>';
+      sh.innerHTML = '<span class="setting-label">' + ICON.shake + 'Souke ekran</span>' +
+        '<button type="button" class="switch" role="switch" data-key="shake" aria-label="Souke ekran"><span class="knob"></span></button>';
     }
 
     this.root.addEventListener('click', function (e) {
@@ -404,7 +431,7 @@
     var muted = !d.sfx && !d.music;
     var q = this.$('btn-sound-quick');
     q.innerHTML = muted ? ICON.mute : ICON.sfx;
-    q.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
+    q.setAttribute('aria-label', muted ? 'Remete son' : 'Koupe son');
     q.classList.toggle('is-off', muted);
   };
 
@@ -454,9 +481,9 @@
   };
 
   UI.prototype._nameError = function (reason) {
-    if (reason === 'taken') return 'That username is already taken. Choose another.';
-    if (reason === 'invalid') return 'Use 2-14 letters, numbers, spaces, or _ . -';
-    return 'Could not verify the username. Check your connection and try again.';
+    if (reason === 'taken') return 'Non sa a deja pran. Chwazi yon lòt.';
+    if (reason === 'invalid') return 'Sèvi ak 2 a 14 lèt, chif, espas oswa siy sa yo: _ . -';
+    return 'Nou pa ka verifye non an. Verifye koneksyon entènèt ou, epi eseye ankò.';
   };
 
   UI.prototype._submitUsername = function () {
@@ -472,7 +499,7 @@
     this._usernameSaving = true;
     input.disabled = true;
     this.$('btn-username-save').disabled = true;
-    this._usernameStatus('Checking username…', '');
+    this._usernameStatus('N ap verifye non an…', '');
     this.lb.rename(name).then(function (result) {
       if (result.ok) {
         input.value = result.name;
@@ -497,27 +524,48 @@
     this.boardEl.setAttribute('aria-hidden', 'false');
     this.$('name-input').value = this.lb.name();
     this._nameStatus('', '');
-    this._loadBoard();
+    this._setBoard(this.boardKind);
   };
 
   UI.prototype.closeBoard = function () {
     if (!this.boardOpen) return;
     this.boardOpen = false;
     this._boardReq++;
+    this._presenceReq++;
+    if (this._presenceTimer) {
+      window.clearInterval(this._presenceTimer);
+      this._presenceTimer = 0;
+    }
     this.$('name-input').blur();
     this.boardEl.classList.remove('active');
     this.boardEl.setAttribute('aria-hidden', 'true');
   };
 
   UI.prototype._setBoard = function (kind) {
-    this.boardKind = kind === 'all' ? 'all' : 'week';
+    this.boardKind = kind === 'all' || kind === 'live' ? kind : 'week';
     var tabs = this.boardEl.querySelectorAll('.tab');
     for (var i = 0; i < tabs.length; i++) {
       var on = tabs[i].getAttribute('data-board') === this.boardKind;
       tabs[i].classList.toggle('active', on);
       tabs[i].setAttribute('aria-selected', on ? 'true' : 'false');
     }
-    this._loadBoard();
+    var live = this.boardKind === 'live';
+    this.$('ranking-view').hidden = live;
+    this.$('live-view').hidden = !live;
+    if (this._presenceTimer) {
+      window.clearInterval(this._presenceTimer);
+      this._presenceTimer = 0;
+    }
+    if (live) {
+      this.globe.render([]);
+      this._loadPresence();
+      this._presenceTimer = window.setInterval(function () {
+        if (this.boardOpen && this.boardKind === 'live') this._loadPresence();
+      }.bind(this), 20000);
+    } else {
+      this._presenceReq++;
+      this._loadBoard();
+    }
   };
 
   function el(tag, cls, text) {
@@ -527,11 +575,17 @@
     return n;
   }
 
+  function locationName(location) {
+    var code = location.country || '';
+    var country = COUNTRY_NAMES_HT[code] || (code ? 'Peyi ' + code : '');
+    return location.region ? location.region + ', ' + country : country;
+  }
+
   function boardRow(e, isYou) {
     var row = el('div', 'row' + (e.rank <= 3 ? ' top' + e.rank : '') + (isYou ? ' you' : ''));
     row.setAttribute('role', 'listitem');
     row.appendChild(el('span', 'rk', e.rank));
-    row.appendChild(el('span', 'nm', e.name + (isYou ? '  (you)' : '')));
+    row.appendChild(el('span', 'nm', e.name + (isYou ? '  (ou)' : '')));
     row.appendChild(el('span', 'sc', e.score));
     return row;
   }
@@ -546,7 +600,7 @@
       var b = el('button', 'btn btn-secondary btn-small');
       b.type = 'button';
       b.setAttribute('data-retry', '1');
-      b.appendChild(el('span', '', 'TRY AGAIN'));
+      b.appendChild(el('span', '', 'ESEYE ANKÒ'));
       box.appendChild(b);
     }
     list.appendChild(box);
@@ -556,7 +610,7 @@
     var self = this, req = ++this._boardReq, kind = this.boardKind;
     var you = this.$('board-you');
     you.textContent = '';
-    this._boardMessage('Loading the ranking…', false, true);
+    this._boardMessage('N ap chaje klasman an…', false, true);
 
     this.lb.top(kind).then(function (data) {
       if (req !== self._boardReq) return;
@@ -564,7 +618,9 @@
       list.textContent = '';
       var entries = data.entries || [];
       if (!entries.length) {
-        self._boardMessage(kind === 'week' ? 'No scores yet this week. Be the first!' : 'No scores yet. Be the first!');
+        self._boardMessage(kind === 'week'
+          ? 'Pèsonn poko fè pwen semèn sa a. Se ou ki ka pran premye plas la!'
+          : 'Pèsonn poko fè pwen. Se ou ki ka pran premye plas la!');
       } else {
         var frag = document.createDocumentFragment(), mine = null;
         for (var i = 0; i < entries.length; i++) {
@@ -580,11 +636,71 @@
       if (data.you && data.you.rank > entries.length) {
         you.appendChild(boardRow(data.you, true));
       } else if (!data.you) {
-        you.appendChild(el('div', 'board-note', kind === 'week' ? 'Score a point this week to enter the ranking.' : 'Score a point to enter the ranking.'));
+        you.appendChild(el('div', 'board-note', kind === 'week'
+          ? 'Fè omwen yon pwen semèn sa a pou antre nan klasman an.'
+          : 'Fè omwen yon pwen pou antre nan klasman an.'));
       }
     }).catch(function () {
       if (req !== self._boardReq) return;
-      self._boardMessage('The ranking can’t be reached right now.', true);
+      self._boardMessage('Nou pa ka konekte ak klasman an kounye a.', true);
+    });
+  };
+
+  UI.prototype._loadPresence = function () {
+    var self = this, req = ++this._presenceReq;
+    var summary = this.$('presence-summary');
+    var list = this.$('presence-locations');
+    var message = this.$('presence-message');
+    summary.textContent = 'N ap chaje jwè aktif yo…';
+    list.textContent = '';
+    message.textContent = '';
+
+    this.presence.locations().then(function (data) {
+      if (req !== self._presenceReq || !self.boardOpen || self.boardKind !== 'live') return;
+      if (data.available === false) {
+        summary.textContent = 'Rejyon jwè yo pa disponib sou sèvè lokal sa a.';
+        message.textContent = 'Fonksyon sa a disponib sou Cloudflare Pages.';
+        self.globe.render([]);
+        return;
+      }
+
+      var locations = Array.isArray(data.locations) ? data.locations : [];
+      var players = Number(data.players) || 0;
+      summary.textContent = players + ' jwè aktif kounye a';
+      self.globe.render(locations);
+      if (!locations.length) {
+        message.textContent = players
+          ? 'Poko gen ase enfòmasyon pou montre rejyon yo.'
+          : 'Poko gen jwè k ap jwe. Jwe yon pati pou parèt sou glòb la.';
+        if (self.presence.enabled && self.presence.lastError) {
+          message.textContent += ' Koneksyon w lan pa bay ase enfòmasyon pou jwenn rejyon apwoksimatif ou.';
+        }
+        return;
+      }
+
+      var frag = document.createDocumentFragment();
+      for (var i = 0; i < locations.length && i < 6; i++) {
+        var location = locations[i];
+        var count = Number(location.players) || 0;
+        var item = el('div', 'live-location', locationName(location) + ' · ' + count);
+        item.setAttribute('role', 'listitem');
+        frag.appendChild(item);
+      }
+      list.appendChild(frag);
+      if (self.presence.enabled && self.presence.lastError) {
+        message.textContent = 'Koneksyon w lan pa bay ase enfòmasyon pou jwenn rejyon apwoksimatif ou.';
+      }
+    }).catch(function () {
+      if (req !== self._presenceReq || !self.boardOpen || self.boardKind !== 'live') return;
+      summary.textContent = 'Nou pa ka chaje pozisyon apwoksimatif yo.';
+      message.textContent = 'Verifye koneksyon entènèt ou, epi eseye ankò.';
+      self.globe.render([]);
+      var retry = el('button', 'btn btn-secondary btn-small');
+      retry.type = 'button';
+      retry.setAttribute('data-presence-retry', '1');
+      retry.appendChild(el('span', '', 'ESEYE ANKÒ'));
+      message.appendChild(document.createTextNode(' '));
+      message.appendChild(retry);
     });
   };
 
@@ -597,7 +713,7 @@
   UI.prototype._saveName = function () {
     var self = this, input = this.$('name-input');
     if (S.Leaderboard.cleanName(input.value) === this.lb.name()) { input.blur(); return; }
-    this._nameStatus('Saving…', '');
+    this._nameStatus('N ap sove…', '');
     this.lb.rename(input.value).then(function (r) {
       if (!r.ok) {
         self._nameStatus(self._nameError(r.reason), 'err');
@@ -605,7 +721,7 @@
       }
       input.value = r.name;
       input.blur();
-      self._nameStatus('Name saved', 'ok');
+      self._nameStatus('Non an sove.', 'ok');
       if (self.boardOpen) self._loadBoard();
     });
   };
@@ -616,21 +732,23 @@
     box.textContent = '';
     box.className = 'over-rank';
     if (r.score < 1) return;
-    box.appendChild(el('span', 'rank-text', 'Sending score…'));
+    box.appendChild(el('span', 'rank-text', 'N ap voye pwen yo…'));
 
     this.lb.submit(r.score).then(function (res) {
       if (run !== self._runId) return;
       box.textContent = '';
       if (!res.ok) {
         box.className = 'over-rank muted';
-        box.appendChild(el('span', 'rank-text', res.reason === 'rejected' ? 'Score not accepted by the ranking' : 'World ranking offline'));
+        box.appendChild(el('span', 'rank-text', res.reason === 'rejected'
+          ? 'Klasman an pa aksepte pwen sa yo.'
+          : 'Klasman mondyal la pa disponib.'));
         return;
       }
       box.className = 'over-rank show';
       var icon = el('span', 'rank-icon');
       icon.innerHTML = ICON.globe; // static markup, not user data
       box.appendChild(icon);
-      var txt = 'Week #' + res.rank.week + '  ·  All time #' + res.rank.all;
+      var txt = 'Semèn sa a: #' + res.rank.week + '  ·  Tout tan: #' + res.rank.all;
       box.appendChild(el('span', 'rank-text', txt));
       if (res.rank.week <= 3) self.audio.play('milestone');
     });
@@ -664,12 +782,12 @@
     medalEl.innerHTML = '';
     nameEl.textContent = '';
 
-    if (r.medal && r.medal.id === 'platinum') hint.textContent = 'Legendary flying!';
+    if (r.medal && r.medal.id === 'platinum') hint.textContent = 'Ou vole tankou yon lejand!';
     else if (r.next) {
       var diff = r.next.min - r.score;
       hint.textContent = r.medal || r.score > 0
-        ? diff + ' more for ' + r.next.name
-        : 'Score ' + r.next.min + ' to earn ' + r.next.name;
+        ? 'Fè ' + diff + ' pwen anplis pou jwenn meday ' + r.next.name + '.'
+        : 'Fè ' + r.next.min + ' pwen pou jwenn meday ' + r.next.name + '.';
     }
 
     this._show('over');

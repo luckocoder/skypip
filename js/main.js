@@ -10,7 +10,9 @@
     var confetti = new S.Confetti(document.getElementById('fx'));
     game.frameHooks.push(function (dt) { confetti.frame(dt); });
     var board = new S.Leaderboard(store);
-    var ui = new S.UI(game, audio, store, confetti, board);
+    var presence = new S.Presence(store);
+    game.on('state', function (state) { presence.setPlaying(state === 'playing'); });
+    var ui = new S.UI(game, audio, store, confetti, board, presence);
 
     new S.Input(canvas, {
       action: function (source) {
@@ -40,7 +42,7 @@
     window.addEventListener('blur', function () { game.pause(); });
 
     document.documentElement.classList.add('ready');
-    S.app = { game: game, ui: ui, audio: audio, store: store, board: board };
+    S.app = { game: game, ui: ui, audio: audio, store: store, board: board, presence: presence };
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

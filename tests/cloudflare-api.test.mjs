@@ -44,6 +44,86 @@ class MemoryD1 {
   }
 }
 
+class PresenceD1 {
+  constructor() {
+    this.activePlayers = new Map();
+  }
+
+  prepare(query) {
+    const db = this;
+    let values = [];
+    return {
+      bind(...args) {
+        values = args;
+        return this;
+      },
+      async first() {
+        if (query === 'SELECT COUNT(*) AS players FROM active_players WHERE last_seen >= ?') {
+          return { players: Array.from(db.activePlayers.values()).filter((row) => row.last_seen >= values[0]).length };
+        }
+        assert.fail('Unexpected first() query: ' + query);
+      },
+      async all() {
+        assert.match(query, /FROM active_players/);
+        const since = values[0];
+        const groups = new Map();
+        for (const row of db.activePlayers.values()) {
+          if (row.last_seen < since) continue;
+          const key = [row.country_code, row.region].join('|');
+          const group = groups.get(key) || {
+            country: row.country_code,
+            region: row.region,
+            latitude: 0,
+            longitude: 0,
+            coordinateCount: 0,
+            players: 0
+          };
+          if (row.latitude !== null && row.longitude !== null) {
+            group.latitude += row.latitude;
+            group.longitude += row.longitude;
+            group.coordinateCount++;
+          }
+          group.players++;
+          groups.set(key, group);
+        }
+        return {
+          results: Array.from(groups.values()).map((group) => ({
+            country: group.country,
+            region: group.region,
+            latitude: group.coordinateCount ? Math.round(group.latitude / group.coordinateCount / 2) * 2 : null,
+            longitude: group.coordinateCount ? Math.round(group.longitude / group.coordinateCount / 2) * 2 : null,
+            players: group.players
+          }))
+        };
+      },
+      async run() {
+        if (query === 'DELETE FROM active_players WHERE last_seen < ?') {
+          for (const [id, row] of db.activePlayers) {
+            if (row.last_seen < values[0]) db.activePlayers.delete(id);
+          }
+          return { meta: { changes: 1 } };
+        }
+        if (query === 'DELETE FROM active_players WHERE session_id = ?') {
+          db.activePlayers.delete(values[0]);
+          return { meta: { changes: 1 } };
+        }
+        if (query.includes('INSERT INTO active_players')) {
+          const [session_id, country_code, region, latitude, longitude, last_seen] = values;
+          db.activePlayers.set(session_id, { session_id, country_code, region, latitude, longitude, last_seen });
+          return { meta: { changes: 1 } };
+        }
+        assert.fail('Unexpected run() query: ' + query);
+      }
+    };
+  }
+}
+
+function requestWithLocation(url, init, location) {
+  const request = new Request(url, init);
+  Object.defineProperty(request, 'cf', { value: location });
+  return request;
+}
+
 test('session endpoint returns a signed run token', async () => {
   const response = await api(
     new Request('https://skypip.example/api/session', { method: 'POST' }),
@@ -107,4 +187,73 @@ test('username claims are case-insensitively unique', async () => {
   assert.equal(first.status, 200);
   assert.equal(duplicate.status, 409);
   assert.equal(db.players.size, 1);
+});
+
+test('live presence stores coarse region aggregates and removes opted-out sessions', async () => {
+  const db = new PresenceD1();
+  const endpoint = 'https://skypip.example/api/presence';
+  const options = { method: 'POST', headers: { 'Content-Type': 'application/json' } };
+  const body = (sessionId, share) => JSON.stringify({ sessionId, share });
+  const addPlayer = await api(requestWithLocation(
+    endpoint,
+    { ...options, body: body('session_presence_0001', true) },
+    { country: 'us', region: ' New York ', latitude: 40.7128, longitude: -74.006 }
+  ), { DB: db });
+  const addSecondPlayer = await api(requestWithLocation(
+    endpoint,
+    { ...options, body: body('session_presence_0002', true) },
+    { country: 'US', region: 'New York', latitude: 42, longitude: -70 }
+  ), { DB: db });
+
+  assert.equal(addPlayer.status, 200);
+  assert.deepEqual(await addPlayer.json(), { ok: true, located: true });
+  assert.equal(addSecondPlayer.status, 200);
+
+  const live = await api(new Request(endpoint), { DB: db });
+  assert.deepEqual(await live.json(), {
+    available: true,
+    players: 2,
+    locations: [{ country: 'US', region: 'New York', latitude: 42, longitude: -72, players: 2 }]
+  });
+
+  const removePlayer = await api(new Request(endpoint, {
+    ...options,
+    body: body('session_presence_0001', false)
+  }), { DB: db });
+  assert.equal(removePlayer.status, 200);
+  const remaining = await api(new Request(endpoint), { DB: db });
+  assert.deepEqual(await remaining.json(), {
+    available: true,
+    players: 1,
+    locations: [{ country: 'US', region: 'New York', latitude: 42, longitude: -70, players: 1 }]
+  });
+  await api(new Request(endpoint, { ...options, body: body('session_presence_0002', false) }), { DB: db });
+  assert.equal(db.activePlayers.size, 0);
+});
+
+test('live presence does not store a location when Cloudflare location data is unavailable', async () => {
+  const db = new PresenceD1();
+  const response = await api(new Request('https://skypip.example/api/presence', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId: 'session_presence_0002', share: true })
+  }), { DB: db });
+
+  assert.deepEqual(await response.json(), { ok: true, located: false });
+  assert.equal(db.activePlayers.size, 0);
+});
+
+test('live presence excludes expired sessions from the public map', async () => {
+  const db = new PresenceD1();
+  db.activePlayers.set('session_presence_expired', {
+    session_id: 'session_presence_expired',
+    country_code: 'US',
+    region: 'New York',
+    latitude: 40,
+    longitude: -74,
+    last_seen: Date.now() - 120000
+  });
+
+  const response = await api(new Request('https://skypip.example/api/presence'), { DB: db });
+  assert.deepEqual(await response.json(), { available: true, players: 0, locations: [] });
 });

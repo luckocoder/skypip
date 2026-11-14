@@ -8,6 +8,8 @@
  *   POST /api/name    {playerId,name}     -> { ok, name }
  *   GET  /api/scores?board=all|week&limit=50&player=ID
  *                                         -> { board, week, total, entries:[{rank,name,score,you}], you }
+ *   GET  /api/presence                       -> { available, players, locations }
+ *   POST /api/presence {sessionId,share}     -> { ok, located }
  *
  * Environment:
  *   PORT                 (default 3000)
@@ -255,6 +257,21 @@ async function api(req, res, url) {
   if (route === 'GET /api/health') return send(res, 200, { ok: true, players: Object.keys(db.players).length });
 
   if (route === 'POST /api/session') return send(res, 200, { token: newToken() });
+
+  if (route === 'GET /api/presence') {
+    return send(res, 200, { available: false, players: 0, locations: [] });
+  }
+
+  if (route === 'POST /api/presence') {
+    let body;
+    try { body = await readJson(req); } catch (e) { return send(res, 400, { error: 'Bad request' }); }
+    if (!body || typeof body !== 'object' || Array.isArray(body) ||
+        typeof body.sessionId !== 'string' || !/^[A-Za-z0-9_-]{16,64}$/.test(body.sessionId) ||
+        typeof body.share !== 'boolean') {
+      return send(res, 400, { error: 'Bad request' });
+    }
+    return send(res, 200, { ok: true, located: false });
+  }
 
   if (route === 'GET /api/scores') {
     const kind = url.searchParams.get('board') === 'all' ? 'all' : 'week';

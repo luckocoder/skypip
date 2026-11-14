@@ -3,10 +3,13 @@ const MAX_PLAYERS = 200000;
 const TOKEN_MAX_AGE = 6 * 60 * 60 * 1000;
 const MAX_BODY = 2048;
 const ID_RE = /^[A-Za-z0-9_-]{16,64}$/;
+const PRESENCE_ID_RE = /^[A-Za-z0-9_-]{16,64}$/;
+const PRESENCE_TTL = 90_000;
 const NAME_RE = /^[\p{L}\p{N} _.\-]{2,14}$/u;
 const encoder = new TextEncoder();
 const hits = new Map();
 let lastHitCleanup = 0;
+let lastPresenceCleanup = 0;
 
 function response(status, data = null) {
   const headers = {
@@ -39,6 +42,35 @@ function cleanName(value) {
 
 function nameKey(name) {
   return name.normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function coarseCoordinate(value, min, max) {
+  if (value === null || value === undefined || value === '') return null;
+  const coordinate = Number(value);
+  if (!Number.isFinite(coordinate) || coordinate < min || coordinate > max) return null;
+  return Math.round(coordinate / 2) * 2;
+}
+
+function requestLocation(request) {
+  const cf = request.cf;
+  if (!cf || typeof cf !== 'object') return null;
+  const country = typeof cf.country === 'string' ? cf.country.trim().toUpperCase() : '';
+  if (!/^[A-Z]{2}$/.test(country)) return null;
+  const regionName = typeof cf.region === 'string' ? cf.region.trim().replace(/\s+/g, ' ') : '';
+  const regionCode = typeof cf.regionCode === 'string' ? cf.regionCode.trim() : '';
+  const region = (regionName || regionCode).slice(0, 80);
+  return {
+    country,
+    region,
+    latitude: coarseCoordinate(cf.latitude, -90, 90),
+    longitude: coarseCoordinate(cf.longitude, -180, 180)
+  };
+}
+
+async function cleanupPresence(db, now) {
+  if (now - lastPresenceCleanup < 60_000) return;
+  lastPresenceCleanup = now;
+  await db.prepare('DELETE FROM active_players WHERE last_seen < ?').bind(now - PRESENCE_TTL).run();
 }
 
 function limited(request, cost) {
@@ -203,6 +235,70 @@ export async function api(request, env) {
     if (request.method === 'POST' && url.pathname === '/api/session') {
       if (!env.LEADERBOARD_SECRET) return response(503, { error: 'LEADERBOARD_SECRET is not configured' });
       return response(200, { token: await newToken(env.LEADERBOARD_SECRET) });
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/presence') {
+      if (!env.DB) return response(503, { error: 'D1 binding DB is not configured' });
+      const now = Date.now();
+      await cleanupPresence(env.DB, now);
+      const since = now - PRESENCE_TTL;
+      const count = await env.DB.prepare(
+        'SELECT COUNT(*) AS players FROM active_players WHERE last_seen >= ?'
+      ).bind(since).first();
+      const rows = await env.DB.prepare(
+        `SELECT country_code AS country, region,
+                ROUND(AVG(latitude) / 2.0) * 2 AS latitude,
+                ROUND(AVG(longitude) / 2.0) * 2 AS longitude,
+                COUNT(*) AS players
+         FROM active_players
+         WHERE last_seen >= ?
+         GROUP BY country_code, region
+         ORDER BY players DESC
+         LIMIT 100`
+      ).bind(since).all();
+      return response(200, { available: true, players: count.players, locations: rows.results });
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/presence') {
+      if (!env.DB) return response(503, { error: 'D1 binding DB is not configured' });
+      let body;
+      try {
+        body = await readJson(request);
+      } catch {
+        return response(400, { error: 'Bad request' });
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return response(400, { error: 'Bad request' });
+      if (typeof body.sessionId !== 'string' || !PRESENCE_ID_RE.test(body.sessionId)) {
+        return response(400, { error: 'Invalid session' });
+      }
+      if (typeof body.share !== 'boolean') return response(400, { error: 'Invalid sharing preference' });
+
+      const now = Date.now();
+      await cleanupPresence(env.DB, now);
+      if (!body.share) {
+        await env.DB.prepare('DELETE FROM active_players WHERE session_id = ?').bind(body.sessionId).run();
+        return response(200, { ok: true, located: false });
+      }
+
+      const location = requestLocation(request);
+      if (!location) {
+        await env.DB.prepare('DELETE FROM active_players WHERE session_id = ?').bind(body.sessionId).run();
+        return response(200, { ok: true, located: false });
+      }
+      await env.DB.prepare(
+        `INSERT INTO active_players (session_id, country_code, region, latitude, longitude, last_seen)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(session_id) DO UPDATE SET
+           country_code = excluded.country_code,
+           region = excluded.region,
+           latitude = excluded.latitude,
+           longitude = excluded.longitude,
+           last_seen = excluded.last_seen`
+      ).bind(
+        body.sessionId, location.country, location.region,
+        location.latitude, location.longitude, now
+      ).run();
+      return response(200, { ok: true, located: true });
     }
 
     if (request.method === 'GET' && url.pathname === '/api/scores') {

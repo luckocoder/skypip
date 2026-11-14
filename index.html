@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="ht">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#3fa9e8">
-  <meta name="description" content="Skypip — a polished one-touch arcade flyer. Tap to fly, dodge the pipes, chase the sky.">
+  <meta name="description" content="Skypip — yon jwèt senp kote w gide yon zwazo ak yon sèl touche. Tape pou fè l vole, evite tiyo yo, epi eseye ale pi lwen.">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -18,70 +18,71 @@
 </head>
 <body>
   <div id="app">
-    <canvas id="game" aria-label="Skypip game area. Tap, click or press Space to fly."></canvas>
+    <canvas id="game" aria-label="Zòn jwèt Skypip la. Tape, klike oswa peze Espas pou fè zwazo a vole."></canvas>
     <div id="vignette" aria-hidden="true"></div>
 
     <div id="ui">
       <!-- HUD -->
       <div class="hud" id="hud">
         <div class="score" id="score" aria-live="polite">0</div>
-        <button type="button" class="icon-btn hud-pause" id="btn-pause" aria-label="Pause">
+        <button type="button" class="icon-btn hud-pause" id="btn-pause" aria-label="Mete jwèt la an poz">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4.2" height="14" rx="1.6" fill="currentColor"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.6" fill="currentColor"/></svg>
         </button>
       </div>
       <div class="toast" id="toast" role="status"></div>
 
       <!-- MAIN MENU -->
-      <section class="screen screen-menu" id="screen-menu" aria-label="Main menu">
+      <section class="screen screen-menu" id="screen-menu" aria-label="Meni prensipal">
         <div class="logo" role="img" aria-label="Skypip">
           <div class="logo-word" aria-hidden="true">
             <span style="--i:0">S</span><span style="--i:1">K</span><span style="--i:2">Y</span><span class="alt" style="--i:3">P</span><span class="alt" style="--i:4">I</span><span class="alt" style="--i:5">P</span>
           </div>
-          <div class="logo-tag">a tiny bird &middot; a very big sky</div>
+          <div class="logo-tag">Yon ti zwazo &middot; yon syèl san limit</div>
         </div>
 
         <div class="menu-bottom">
           <div class="best-pill">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h10v5.5a5 5 0 0 1-10 0z" fill="currentColor"/><path d="M7 5.5H4.2a3.2 3.2 0 0 0 3.3 4.4M17 5.5h2.8a3.2 3.2 0 0 1-3.3 4.4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 14v3.5M8 20.5h8M9.5 17.5h5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
-            <span>BEST</span><strong id="menu-best">0</strong>
+            <span>PI BON</span><strong id="menu-best">0</strong>
           </div>
           <button type="button" class="btn btn-primary btn-play" id="btn-play">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6a1.2 1.2 0 0 0 1.8 1l10.6-6.8a1.2 1.2 0 0 0 0-2L9.8 4.2A1.2 1.2 0 0 0 8 5.2z" fill="currentColor"/></svg>
-            <span>PLAY</span>
+            <span>JWE</span>
           </button>
           <div class="menu-row">
-            <button type="button" class="icon-btn" id="btn-sound-quick" aria-label="Mute"></button>
-            <button type="button" class="icon-btn icon-btn-accent" id="btn-board" aria-label="World ranking">
+            <button type="button" class="icon-btn" id="btn-sound-quick" aria-label="Koupe son"></button>
+            <button type="button" class="icon-btn icon-btn-accent" id="btn-board" aria-label="Klasman mondyal">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 20.5v-7.5h6v7.5zM9 20.5V5.5h6v15zM15.5 20.5v-10h6v10z" fill="currentColor"/></svg>
             </button>
-            <button type="button" class="icon-btn" id="btn-settings" aria-label="Settings">
+            <button type="button" class="icon-btn" id="btn-settings" aria-label="Paramèt">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.2" fill="none" stroke="currentColor" stroke-width="4.4" stroke-dasharray="3.4 2.25"/><circle cx="12" cy="12" r="5.6" fill="none" stroke="currentColor" stroke-width="2.6"/></svg>
             </button>
           </div>
+          <p class="live-disclosure">Lè w ap jwe, glòb la montre rejyon apwoksimatif kote w ye a, san non w. Ou ka fèmen pataj la nan Klasman mondyal &gt; An dirèk.</p>
         </div>
-        <p class="hint-keys mouse-only">Space / &uarr; to flap &nbsp;&middot;&nbsp; Esc to pause &nbsp;&middot;&nbsp; M to mute</p>
+        <p class="hint-keys mouse-only">Espas / &uarr; pou vole &nbsp;&middot;&nbsp; Esc pou mete an poz &nbsp;&middot;&nbsp; M pou koupe son</p>
       </section>
 
       <!-- READY -->
-      <section class="screen screen-ready" id="screen-ready" aria-label="Get ready">
-        <h2 class="title title-ready">GET READY</h2>
+      <section class="screen screen-ready" id="screen-ready" aria-label="Pare w pou vole">
+        <h2 class="title title-ready">PARE W!</h2>
         <div class="chevrons" aria-hidden="true"><i></i><i></i><i></i></div>
         <div class="ready-hint">
           <div class="tap-icon touch-only" aria-hidden="true"><span class="tap-dot"></span><span class="tap-ring"></span><span class="tap-ring r2"></span></div>
-          <div class="keycap mouse-only" aria-hidden="true">SPACE</div>
-          <p class="ready-sub"><span class="touch-only">Tap to fly</span><span class="mouse-only">Click or press Space to fly</span></p>
+          <div class="keycap mouse-only" aria-hidden="true">ESPAS</div>
+          <p class="ready-sub"><span class="touch-only">Tape pou vole</span><span class="mouse-only">Klike oswa peze Espas pou vole</span></p>
         </div>
       </section>
 
       <!-- RESUME COUNTDOWN -->
-      <section class="screen screen-count" id="screen-count" aria-label="Resuming">
+      <section class="screen screen-count" id="screen-count" aria-label="N ap reprann jwèt la">
         <div class="count-num" id="count-num">3</div>
       </section>
 
       <!-- GAME OVER -->
-      <section class="screen screen-over" id="screen-over" aria-label="Game over">
+      <section class="screen screen-over" id="screen-over" aria-label="Jwèt la fini">
         <div class="over-wrap">
-          <h2 class="title title-over">GAME OVER</h2>
+          <h2 class="title title-over">JWÈT LA FINI</h2>
           <div class="panel over-panel">
             <div class="medal-slot" id="medal-slot">
               <div class="medal-rays"></div>
@@ -92,11 +93,11 @@
             </div>
             <div class="over-stats">
               <div class="stat">
-                <span class="stat-label">SCORE</span>
+                <span class="stat-label">PWEN</span>
                 <span class="stat-value" id="over-score">0</span>
               </div>
               <div class="stat">
-                <span class="stat-label">BEST <em class="badge-new" id="badge-new">NEW!</em></span>
+                <span class="stat-label">PI BON <em class="badge-new" id="badge-new">NOUVO!</em></span>
                 <span class="stat-value" id="over-best">0</span>
               </div>
             </div>
@@ -106,12 +107,12 @@
           <div class="btn-row">
             <button type="button" class="btn btn-primary btn-restart" id="btn-restart">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M4 3.5v5h5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              <span>PLAY AGAIN</span>
+              <span>JWE ANKÒ</span>
             </button>
-            <button type="button" class="btn btn-violet btn-square" id="btn-over-board" aria-label="World ranking">
+            <button type="button" class="btn btn-violet btn-square" id="btn-over-board" aria-label="Klasman mondyal">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 20.5v-7.5h6v7.5zM9 20.5V5.5h6v15zM15.5 20.5v-10h6v10z" fill="currentColor"/></svg>
             </button>
-            <button type="button" class="btn btn-secondary btn-square" id="btn-over-menu" aria-label="Main menu">
+            <button type="button" class="btn btn-secondary btn-square" id="btn-over-menu" aria-label="Meni prensipal">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11.2 12 4l8.5 7.2V19a1.5 1.5 0 0 1-1.5 1.5h-4.2v-6h-5.6v6H5A1.5 1.5 0 0 1 3.5 19z" fill="currentColor"/></svg>
             </button>
           </div>
@@ -119,62 +120,76 @@
       </section>
 
       <!-- PAUSE -->
-      <section class="screen screen-pause modal" id="screen-pause" aria-label="Paused">
+      <section class="screen screen-pause modal" id="screen-pause" aria-label="Jwèt la an poz">
         <div class="panel menu-panel">
-          <h2 class="ribbon">PAUSED</h2>
+          <h2 class="ribbon">AN POZ</h2>
           <button type="button" class="btn btn-primary btn-block" id="btn-resume">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6a1.2 1.2 0 0 0 1.8 1l10.6-6.8a1.2 1.2 0 0 0 0-2L9.8 4.2A1.2 1.2 0 0 0 8 5.2z" fill="currentColor"/></svg>
-            <span>RESUME</span>
+            <span>KONTINYE</span>
           </button>
           <button type="button" class="btn btn-secondary btn-block" id="btn-pause-restart">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M4 3.5v5h5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span>RESTART</span>
+            <span>REKÒMANSE</span>
           </button>
           <div class="settings-group" data-sound-controls></div>
           <button type="button" class="btn btn-ghost btn-block" id="btn-pause-menu">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11.2 12 4l8.5 7.2V19a1.5 1.5 0 0 1-1.5 1.5h-4.2v-6h-5.6v6H5A1.5 1.5 0 0 1 3.5 19z" fill="currentColor"/></svg>
-            <span>MAIN MENU</span>
+            <span>MENI PRENSIPAL</span>
           </button>
         </div>
       </section>
 
       <!-- SETTINGS -->
-      <section class="screen screen-settings modal" id="screen-settings" aria-label="Settings" aria-hidden="true">
+      <section class="screen screen-settings modal" id="screen-settings" aria-label="Paramèt" aria-hidden="true">
         <div class="panel menu-panel">
-          <h2 class="ribbon">SETTINGS</h2>
+          <h2 class="ribbon">PARAMÈT</h2>
           <div class="settings-group" data-sound-controls></div>
           <div class="settings-group"><div class="setting-row" id="shake-row"></div></div>
-          <button type="button" class="btn btn-primary btn-block" id="btn-settings-close"><span>DONE</span></button>
+          <button type="button" class="btn btn-primary btn-block" id="btn-settings-close"><span>FINI</span></button>
         </div>
       </section>
 
       <!-- WORLD RANKING -->
-      <section class="screen screen-board modal" id="screen-board" aria-label="World ranking" aria-hidden="true">
+      <section class="screen screen-board modal" id="screen-board" aria-label="Klasman mondyal" aria-hidden="true">
         <div class="panel menu-panel board-panel">
-          <h2 class="ribbon">WORLD RANKING</h2>
+          <h2 class="ribbon">KLASMAN MONDYAL</h2>
           <div class="board-tabs" role="tablist">
-            <button type="button" class="tab active" data-board="week" role="tab" aria-selected="true">THIS WEEK</button>
-            <button type="button" class="tab" data-board="all" role="tab" aria-selected="false">ALL TIME</button>
+            <button type="button" class="tab active" data-board="week" role="tab" aria-selected="true">SEMÈN SA A</button>
+            <button type="button" class="tab" data-board="all" role="tab" aria-selected="false">TOUT TAN</button>
+            <button type="button" class="tab" data-board="live" role="tab" aria-selected="false">AN DIRÈK</button>
           </div>
-          <div class="board-list" id="board-list" role="list" tabindex="-1"></div>
-          <div class="board-you" id="board-you"></div>
-          <form class="name-row" id="name-form" novalidate>
-            <input class="text-input" id="name-input" type="text" maxlength="14" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" aria-label="Your player name" placeholder="Your name">
-            <button type="submit" class="btn btn-secondary btn-small" id="btn-name-save"><span>SAVE</span></button>
-          </form>
-          <div class="name-status" id="name-status" role="status"></div>
-          <button type="button" class="btn btn-primary btn-block" id="btn-board-close"><span>DONE</span></button>
+          <div id="ranking-view">
+            <div class="board-list" id="board-list" role="list" tabindex="-1"></div>
+            <div class="board-you" id="board-you"></div>
+            <form class="name-row" id="name-form" novalidate>
+              <input class="text-input" id="name-input" type="text" maxlength="14" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" aria-label="Non jwè w" placeholder="Non w">
+              <button type="submit" class="btn btn-secondary btn-small" id="btn-name-save"><span>SOVE</span></button>
+            </form>
+            <div class="name-status" id="name-status" role="status"></div>
+          </div>
+          <div class="live-view" id="live-view" hidden>
+            <div class="presence-summary" id="presence-summary" role="status">N ap chaje jwè aktif yo…</div>
+            <canvas class="live-globe" id="live-globe" aria-label="Glòb ki montre rejyon apwoksimatif kote jwè yo ap jwe"></canvas>
+            <div class="live-locations" id="presence-locations" role="list"></div>
+            <div class="presence-message" id="presence-message" role="status"></div>
+            <label class="presence-toggle">
+              <input type="checkbox" id="presence-share">
+              <span>Pataje rejyon apwoksimatif mwen pandan m ap jwe</span>
+            </label>
+            <p class="presence-privacy">Nou sèvi ak koneksyon w pou estime peyi ak rejyon kote w ye a. Pwen an sou glòb la awondi sou anviwon 200 km. Se sèlman kantite jwè pa rejyon ki parèt. Nou pa anrejistre non w, adrès IP w ni pozisyon GPS presi. Ou ka fèmen pataj la nenpòt lè.</p>
+          </div>
+          <button type="button" class="btn btn-primary btn-block" id="btn-board-close"><span>FINI</span></button>
         </div>
       </section>
 
       <!-- REQUIRED FIRST-VISIT USERNAME -->
-      <section class="screen screen-username modal" id="screen-username" aria-label="Choose a username" aria-hidden="true">
+      <section class="screen screen-username modal" id="screen-username" aria-label="Chwazi yon non itilizatè" aria-hidden="true">
         <div class="panel menu-panel username-panel">
-          <h2 class="ribbon">CHOOSE USERNAME</h2>
-          <p class="username-copy">Pick a unique name for the world ranking. Use 2-14 letters, numbers, spaces, or _ . -</p>
+          <h2 class="ribbon">CHWAZI NON W</h2>
+          <p class="username-copy">Chwazi yon non ki poko pran pou klasman mondyal la. Li dwe gen 2 a 14 lèt, chif, espas oswa siy sa yo: _ . -</p>
           <form class="name-row" id="username-form" novalidate>
-            <input class="text-input" id="username-input" type="text" maxlength="14" autocomplete="username" autocapitalize="off" spellcheck="false" enterkeyhint="done" aria-label="Choose a username" placeholder="Your name" required>
-            <button type="submit" class="btn btn-secondary btn-small" id="btn-username-save"><span>CONTINUE</span></button>
+            <input class="text-input" id="username-input" type="text" maxlength="14" autocomplete="username" autocapitalize="off" spellcheck="false" enterkeyhint="done" aria-label="Chwazi non jwè w" placeholder="Non w" required>
+            <button type="submit" class="btn btn-secondary btn-small" id="btn-username-save"><span>KONTINYE</span></button>
           </form>
           <div class="name-status" id="username-status" role="status" aria-live="polite"></div>
         </div>
@@ -183,13 +198,14 @@
 
     <canvas id="fx" aria-hidden="true"></canvas>
     <div id="curtain" aria-hidden="true"></div>
-    <noscript><div class="noscript">Skypip needs JavaScript to fly.</div></noscript>
+    <noscript><div class="noscript">Jwèt Skypip la bezwen JavaScript pou l mache.</div></noscript>
   </div>
 
   <script src="js/core/config.js"></script>
   <script src="js/core/utils.js"></script>
   <script src="js/core/storage.js"></script>
   <script src="js/core/leaderboard.js"></script>
+  <script src="js/core/presence.js"></script>
   <script src="js/core/audio.js"></script>
   <script src="js/core/input.js"></script>
   <script src="js/world/sprites.js"></script>
@@ -198,6 +214,7 @@
   <script src="js/world/background.js"></script>
   <script src="js/world/pipes.js"></script>
   <script src="js/ui/confetti.js"></script>
+  <script src="js/ui/globe.js"></script>
   <script src="js/ui/ui.js"></script>
   <script src="js/game.js"></script>
   <script src="js/main.js"></script>
